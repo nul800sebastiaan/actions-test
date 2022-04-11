@@ -1,0 +1,7 @@
+name: pr-first-response
+on: [pull_request]
+jobs: 
+  send-response:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: action/checkout@v2
