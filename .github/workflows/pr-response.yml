@@ -1,5 +1,5 @@
 name: pr-first-response
-on: [pull_request]
+on: [push]
 
 jobs: 
   send-response:
@@ -9,10 +9,10 @@ jobs:
       - name: Fetch random comment 🗣️
         uses: JamesIves/fetch-api-data-action@v2.1.0
         with:
-          ENDPOINT: https://envwtw2mocrhl.x.pipedream.net/
+          ENDPOINT: https://webhook.site/00f723b3-783e-42c7-a422-50662a9a94dd
           CONFIGURATION: '{ "method": "POST", "headers": {"Authorization": "Bearer ${{ secrets.OUR_BOT_API_TOKEN }}"}, "body": { "repo": "${{ github.repository }}", "number": "${{ github.event.number }}", "actor": "${{ github.actor }}"} }'
       - name: Dump github context
-        run:   echo "$fetch-api-data $GITHUB_CONTEXT"
+        run:   echo "$fetch-api-data"
         shell: bash
         env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}      
+          GITHUB_CONTEXT: ${{ toJson(github) }}
