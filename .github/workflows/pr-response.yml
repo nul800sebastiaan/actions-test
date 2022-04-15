@@ -15,4 +15,4 @@ jobs:
         run:   echo "$GITHUB_CONTEXT"
         shell: bash
         env:
-          GITHUB_CONTEXT: ${{ env.fetch-api-data }}
+          GITHUB_CONTEXT: ${{ env.fetch-api-data.hello }}
