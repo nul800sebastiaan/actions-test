@@ -14,6 +14,7 @@ jobs:
           ENDPOINT: https://collaboratorsv2.euwest01.umbraco.io/umbraco/api/comments/PostComment
           CONFIGURATION: '{ "method": "POST", "headers": {"Authorization": "Bearer ${{ secrets.OUR_BOT_API_TOKEN }}"}, "body": { "repo": "${{ github.repository }}", "number": "${{ github.event.number }}", "actor": "${{ github.actor }}", "commentType": "opened-pr-first-comment"} }'
       - name: Add PR comment
+        if: "${{ env.fetch-api-data != '' }}"
         uses: actions/github-script@v5
         with:
           script: |
