@@ -11,5 +11,8 @@ jobs:
         with:
           ENDPOINT: https://webhook.site/00f723b3-783e-42c7-a422-50662a9a94dd
           CONFIGURATION: '{ "method": "POST", "headers": {"Authorization": "Bearer ${{ secrets.OUR_BOT_API_TOKEN }}"}, "body": { "repo": "${{ github.repository }}", "number": "${{ github.event.number }}", "actor": "${{ github.actor }}"} }'
-      - name: Test response
-        run: echo ${{ toJson(env) }}
+      - name: Dump github context
+        run:   echo "$GITHUB_CONTEXT"
+        shell: bash
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github.fetch-api-data) }}
