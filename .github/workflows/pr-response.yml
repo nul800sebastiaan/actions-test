@@ -16,3 +16,13 @@ jobs:
         shell: bash
         env:
           API_RESPONSE: ${{ env.fetch-api-data }}
+      - name: Add PR comment
+        uses: actions/github-script@v5
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '${{ env.fetch-api-data }}''
+            })          
