@@ -11,4 +11,7 @@ jobs:
         with:
           ENDPOINT: https://envwtw2mocrhl.x.pipedream.net/
           CONFIGURATION: '{ "method": "GET", "headers": {"Authorization": "Bearer ${{ secrets.OUR_BOT_API_TOKEN }}"} }'
-      - run: echo " Print response from API: ${{ fetch-api-data }} "
+    steps:
+      - name: Check out repo        
+        uses: actions/checkout@v2
+      - run: echo " Print fetch-api-data - ${{ fetch-api-data }} "
