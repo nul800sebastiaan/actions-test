@@ -1,12 +1,11 @@
 name: pr-first-response
+
 on:
-  pull_request_target:
-  types: 
-    - opened
+  pull_request:
+    types: [opened]
 
 jobs: 
   send-response:
-  
     runs-on: ubuntu-latest
     steps:
       - name: Fetch random comment 🗣️
