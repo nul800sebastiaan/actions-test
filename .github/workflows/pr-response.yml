@@ -19,5 +19,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `${{ fromJson(env.fetch-api-data).hello }}`
+              body: `${{ env.fetch-api-data }}`
             })
