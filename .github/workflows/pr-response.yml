@@ -1,5 +1,5 @@
 name: pr-first-response
-on: [pull_request]
+on: [push]
 
 jobs: 
   send-response:
@@ -10,9 +10,9 @@ jobs:
         uses: JamesIves/fetch-api-data-action@v2.1.0
         with:
           ENDPOINT: https://envwtw2mocrhl.x.pipedream.net/
-          CONFIGURATION: '{ "method": "GET", "headers": {"Authorization": "Bearer ${{ secrets.OUR_BOT_API_TOKEN }}"}, "body": {"repo_owner": "umbraco", "repo_name": "Umbraco-CMS", "number": "1234"} }'
+          CONFIGURATION: '{ "method": "POST", "headers": {"Authorization": "Bearer ${{ secrets.OUR_BOT_API_TOKEN }}"}, "body": {"repo_owner": "umbraco", "repo_name": "Umbraco-CMS", "number": "1234"} }'
       - name: Dump github context
         run:   echo "$GITHUB_CONTEXT"
         shell: bash
         env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}          
+          GITHUB_CONTEXT: ${{ toJson(github) }}      
