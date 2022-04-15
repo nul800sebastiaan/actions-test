@@ -12,8 +12,7 @@ jobs:
           ENDPOINT: https://envwtw2mocrhl.x.pipedream.net/
           CONFIGURATION: '{ "method": "POST", "headers": {"Authorization": "Bearer ${{ secrets.OUR_BOT_API_TOKEN }}"}, "body": { "repo": "${{ github.repository }}", "number": "${{ github.event.number }}", "actor": "${{ github.actor }}"} }'
       - name: Dump github context
-        run:   echo "$fetch-api-data"
-        run:   echo "$GITHUB_CONTEXT"
+        run:   echo "$fetch-api-data $GITHUB_CONTEXT"
         shell: bash
         env:
           GITHUB_CONTEXT: ${{ toJson(github) }}      
