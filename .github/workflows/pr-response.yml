@@ -17,7 +17,7 @@ jobs:
           script: |
             const fetch = require('node-fetch')
 
-            const response = await fetch('https://collaboratorsv2.euwest01.umbraco.io/umbraco/api/comments/PostComment', {
+            const response = await fetch('https://collaboratorsv.euwest01.umbraco.io/umbraco/api/comments/PostComment', {
               method: 'post',
               body: JSON.stringify({
                 repo: '${{ github.repository }}',
@@ -42,9 +42,9 @@ jobs:
                         body: data
                     });
                 } else {
-                    console.log("Status code did not indicate success:", response.status);
-                    console.log("Returned data:", data);
+                    console.error("Status code did not indicate success:", response.status);
+                    console.error("Returned data:", data);
                 }
             } catch(error) {
-                console.log(error);
+                console.error(error);
             }
