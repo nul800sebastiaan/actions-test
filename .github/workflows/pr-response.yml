@@ -27,7 +27,7 @@ jobs:
 
             const data = await response.text();
 
-            if(data != '') {
+            if(data !== '') {
               github.rest.issues.createComment({
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
