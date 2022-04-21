@@ -8,6 +8,9 @@ jobs:
   send-response:
     runs-on: ubuntu-latest
     steps:
+      - name: deps
+        run: |
+          npm install node-fetch@2
       - uses: actions/github-script@v6
         with:
           script: |
