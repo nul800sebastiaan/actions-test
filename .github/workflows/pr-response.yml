@@ -8,10 +8,9 @@ jobs:
   send-response:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch random comment 🗣️
-      - name: Add PR comment
-        if: "${{ data != '' }}"
-        run:
+      - uses: actions/github-script@v6
+      - name: Fetch random comment 🗣️ and add it to the PR
+        with:
           script: |
             const response = await fetch('https://collaboratorsv2.euwest01.umbraco.io/umbraco/api/comments/PostComment', {
               method: 'post',
@@ -28,10 +27,12 @@ jobs:
             });
 
             const data = await response.text();
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: data
-            });
+            
+            if(data != '') {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: data
+              });
+            }
