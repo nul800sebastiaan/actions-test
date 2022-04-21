@@ -31,13 +31,20 @@ jobs:
               }
             });
 
-            const data = await response.text();
+            try {
+                const data = await response.text();
 
-            if(data !== '') {
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: data
-              });
+                if(response.status === 200 && data !== '') {
+                    github.rest.issues.createComment({
+                        issue_number: context.issue.number,
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        body: data
+                    });
+                } else {
+                    console.log("Status code did not indicate success:", response.status);
+                    console.log("Returned data:", data);
+                }
+            } catch(error) {
+                console.log(error);
             }
