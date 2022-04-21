@@ -20,7 +20,7 @@ jobs:
                 commentType: 'opened-pr-first-comment'
               }),
               headers: {
-                'Authorization': 'Bearer ${{ secrets.OUR_BOT_API_TOKEN }}'
+                'Authorization': 'Bearer ${{ secrets.OUR_BOT_API_TOKEN }}',
                 'Content-Type': 'application/json'
               }
             });
