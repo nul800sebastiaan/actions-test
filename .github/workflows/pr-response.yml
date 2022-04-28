@@ -45,9 +45,9 @@ jobs:
                         body: data
                     });
                 } else {
-                    console.error("Status code did not indicate success:", response.status);
-                    console.error("Returned data:", data);
+                    console.log("Status code did not indicate success:", response.status);
+                    console.log("Returned data:", data);
                 }
             } catch(error) {
-                console.error(error);
+                console.log(error);
             }
