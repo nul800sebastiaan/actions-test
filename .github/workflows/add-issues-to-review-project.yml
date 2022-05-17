@@ -26,4 +26,5 @@ jobs:
     needs: [getusertype]
     steps:
       - run: |
+          echo "Test ${{ needs.getusertype.outputs }}"
           echo "Output: ${{ needs.getusertype.outputs.output1 }}"
