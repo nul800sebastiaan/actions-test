@@ -1,4 +1,4 @@
-name: Add bugs to bugs project
+name: Add issues to review project
 
 on:
   issues:
@@ -6,7 +6,7 @@ on:
       - opened
 
 jobs:
-  get-user-type:
+  getusertype:
     name: Add issue to project
     runs-on: ubuntu-latest
     steps:
@@ -21,7 +21,7 @@ jobs:
             core.setOutput("output1", `hello`);
   add-to-project:
     runs-on: ubuntu-latest
-    needs: [get-user-type]
+    needs: [getusertype]
     steps:
       - run: |
-          echo "Output: ${{ needs.determine-user-type.outputs.output1 }}"
+          echo "Output: ${{ needs.getusertype.outputs.output1 }}"
