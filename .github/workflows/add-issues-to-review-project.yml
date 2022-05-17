@@ -20,7 +20,7 @@ jobs:
         id: determine-user-type
         with:
           script: |
-            core.setOutput("output1", true);
+            core.setOutput("output1", `true`);
   add-to-project:
     runs-on: ubuntu-latest
     needs: [getusertype]
