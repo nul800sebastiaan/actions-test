@@ -24,4 +24,4 @@ jobs:
     needs: [get-user-type]
     steps:
       - run: |
-          echo "Output: ${{ needs.get-user-type.outputs.output1 }}"
+          echo "Output: ${{ needs.determine-user-type.outputs.output1 }}"
