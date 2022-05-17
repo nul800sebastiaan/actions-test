@@ -22,14 +22,14 @@ jobs:
           script: |
             const fetch = require('node-fetch');
 
-            console.log(JSON.stringify(${{ github.event.issue }}));            
+            console.log(github.event.issue);
 
             const response = await fetch('https://collaboratorsv2.euwest01.umbraco.io/umbraco/api/comments/PostComment', {
               method: 'post',
               body: JSON.stringify({
                 repo: '${{ github.repository }}',
                 number: '${{ github.event.issue.number }}',
-                actor: '${{ github.event.issue.user }} ${{ github.event.issue.creator }} ',
+                actor: '${{ github.event.issue.author }}',
                 commentType: 'labeled-up-for-grabs-first-comment'
               }),
               headers: {
