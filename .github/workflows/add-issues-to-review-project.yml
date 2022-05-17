@@ -9,6 +9,8 @@ jobs:
   getusertype:
     name: Add issue to project
     runs-on: ubuntu-latest
+    outputs:
+      output1: ${{ steps.set-output.outputs.output1 }}
     steps:
       - name: Install dependencies
         run: |
