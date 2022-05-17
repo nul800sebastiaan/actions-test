@@ -22,7 +22,7 @@ jobs:
             const fetch = require('node-fetch');
             const response = await fetch('https://collaboratorsv2.euwest01.umbraco.io/umbraco/api/users/IsIgnoredUser', {
               method: 'post',
-              body: '${{ github.event.issue.user.login }}',
+              body: JSON.stringify('${{ github.event.issue.user.login }}'),
               headers: {
                 'Authorization': 'Bearer ${{ secrets.OUR_BOT_API_TOKEN }}',
                 'Content-Type': 'application/json'
@@ -33,8 +33,6 @@ jobs:
             try {                
                 if(response.status === 200) {
                     const data = await response.text();
-                    console.log("response is", data);
-
                     isIgnoredUser = data === "true";
                 } else {
                     console.log("Returned data not indicate success:", response.status);
@@ -43,7 +41,7 @@ jobs:
                 console.log(error);
             };
             core.setOutput("ignored", isIgnoredUser);
-            console.log("Ignored is", isIgnoredUser, ${{ github.event.issue.user.login }});
+            console.log("Ignored is", isIgnoredUser);
   add-to-project:
     if: needs.get-user-type.outputs.ignored == 'false'
     runs-on: ubuntu-latest
