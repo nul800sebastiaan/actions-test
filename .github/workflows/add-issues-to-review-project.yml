@@ -34,7 +34,7 @@ jobs:
                 if(response.status === 200) {
                     const data = await response.text();
                     console.log("response is", data);
-                    
+
                     isIgnoredUser = data === "true";
                 } else {
                     console.log("Returned data not indicate success:", response.status);
@@ -43,7 +43,7 @@ jobs:
                 console.log(error);
             };
             core.setOutput("ignored", isIgnoredUser);
-            console.log("Ignored is: ", isIgnoredUser)
+            console.log("Ignored is", isIgnoredUser, ${{ github.event.issue.user.login }});
   add-to-project:
     if: needs.get-user-type.outputs.ignored == 'false'
     runs-on: ubuntu-latest
