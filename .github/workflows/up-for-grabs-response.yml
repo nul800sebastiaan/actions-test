@@ -27,7 +27,7 @@ jobs:
               body: JSON.stringify({
                 repo: '${{ github.repository }}',
                 number: '${{ github.event.number }}',
-                actor: '${{ github.issue.author }}',
+                actor: '${{ github.event.issue.author }}',
                 commentType: 'labeled-up-for-grabs-first-comment'
               }),
               headers: {
