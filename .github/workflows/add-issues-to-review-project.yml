@@ -30,12 +30,12 @@ jobs:
             });
 
             var isIgnoredUser = true;
-            try {
-                const data = await response.text();
-
+            try {                
                 if(response.status === 200) {
+                    const data = await response.text();
+                    console.log("response is", data);
+                    
                     isIgnoredUser = data === "true";
-                    console.log(data);
                 } else {
                     console.log("Returned data not indicate success:", response.status);
                 }
