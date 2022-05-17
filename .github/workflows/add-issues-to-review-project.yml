@@ -22,7 +22,7 @@ jobs:
             const fetch = require('node-fetch');
             var response = await fetch('https://collaboratorsv2.euwest01.umbraco.io/umbraco/api/comments/IsIgnoredUser', {
               method: 'post',
-              body: '${{ github.event.issue.user.login }}'
+              body: JSON.stringify({'${{ github.event.issue.user.login }}'})
               }),
               headers: {
                 'Authorization': 'Bearer ${{ secrets.OUR_BOT_API_TOKEN }}',
