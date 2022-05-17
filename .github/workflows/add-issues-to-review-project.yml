@@ -17,7 +17,7 @@ jobs:
           npm install node-fetch@2
       - uses: actions/github-script@v5
         name: "Determing HQ user or not"
-        id: determine-user-type
+        id: set-output
         with:
           script: |
             core.setOutput("output1", `true`);
