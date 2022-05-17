@@ -1,0 +1,27 @@
+name: Add bugs to bugs project
+
+on:
+  issues:
+    types:
+      - opened
+
+jobs:
+  get-user-type:
+    name: Add issue to project
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: |
+          npm install node-fetch@2
+      - uses: actions/github-script@v5
+        name: "Determing HQ user or not"
+        id: determine-user-type
+        with:
+          script: |
+            core.setOutput("output1", `hello`);
+  add-to-project:
+    runs-on: ubuntu-latest
+    needs: [get-user-type]
+    steps:
+      - run: |
+          echo "Output: ${{ needs.get-user-type.outputs.output1 }}"
