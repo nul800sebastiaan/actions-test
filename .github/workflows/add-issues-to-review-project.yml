@@ -34,7 +34,8 @@ jobs:
                 const data = await response.text();
 
                 if(response.status === 200) {
-                    isIgnoredUser = data;
+                    isIgnoredUser = data === "true";
+                    console.log(data);
                 } else {
                     console.log("Returned data not indicate success:", response.status);
                 }
