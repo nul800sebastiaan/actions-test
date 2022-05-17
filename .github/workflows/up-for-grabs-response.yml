@@ -46,7 +46,7 @@ jobs:
                         body: data
                     });
                 } else {
-                    console.log("Returned data not indicate success:");
+                    console.log("Returned data not indicate success.");
                     if(response.status !== 200) {
                       console.log("Status code:", response.status)
                     }
