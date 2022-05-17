@@ -20,7 +20,7 @@ jobs:
         with:
           script: |
             const fetch = require('node-fetch');
-            const response = await fetch('https://collaboratorsv2.euwest01.umbraco.io/umbraco/api/comments/IsIgnoredUser', {
+            var response = await fetch('https://collaboratorsv2.euwest01.umbraco.io/umbraco/api/comments/IsIgnoredUser', {
               method: 'post',
               body: '${{ github.event.issue.user.login }}'
               }),
@@ -30,6 +30,19 @@ jobs:
               }
             });
 
+            try {
+                const data = await response.text();
+
+                if(response.status === 200) {
+                    core.setOutput("output1", data);
+                } else {
+                    console.log("Returned data not indicate success:", response.status);
+                    core.setOutput("output1", false);
+                }
+            } catch(error) {
+                console.log(error);
+                core.setOutput("output1", false);
+            };
   add-to-project:
     if: needs.get-user-type.outputs.output1 == 'true'
     runs-on: ubuntu-latest
