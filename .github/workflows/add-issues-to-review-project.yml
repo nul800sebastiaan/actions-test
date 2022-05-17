@@ -20,7 +20,7 @@ jobs:
         id: set-output
         with:
           script: |
-            core.setOutput("output1", false);
+            core.setOutput("output1", true);
   add-to-project:
     if: needs.get-user-type.outputs.output1 == 'true'
     runs-on: ubuntu-latest
