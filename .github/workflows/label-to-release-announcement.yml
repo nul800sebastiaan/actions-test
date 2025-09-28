@@ -113,7 +113,7 @@ jobs:
             -F repo=$REPO_ID \
             -F cat=$CATEGORY_ID \
             -F title="Release: $VERSION" \
-            -F body="**Release version:** $VERSION\n**Release date:** TODO (YYYY-MM-DD)\n**Status:** TODO\n\n### Highlights\n\n### Community contributions\n\n### Links\n- [Pull requests with $LABEL](https://github.com/${{ github.repository }}/pulls?q=label%3A$LABEL)" \
+            -F body="**Release version:** $VERSION  **Release date:** TODO (YYYY-MM-DD)  **Status:** TODO  ### Highlights  ### Community contributions  ### Links  - [Pull requests with $LABEL](https://github.com/${{ github.repository }}/pulls?q=label%3A$LABEL)" \
             --jq '.data.createDiscussion.discussion.id')
 
           echo "discussionId=$DISCUSSION_ID" >> $GITHUB_OUTPUT
@@ -128,16 +128,41 @@ jobs:
           DISCUSSION_ID="${{ steps.discussion.outputs.discussionId }}"
 
           echo "Ensuring label $LABEL exists..."
-          if ! gh api repos/${{ github.repository }}/labels/$LABEL > /dev/null 2>&1; then
-            gh api repos/${{ github.repository }}/labels -f name="$LABEL" -f color="0E8A16"
+          LABEL_ID=$(gh api graphql -f query='
+            query($repo:String!, $owner:String!, $name:String!) {
+              repository(name:$repo, owner:$owner) {
+                label(name:$name) { id name }
+              }
+            }' \
+            -F owner=${{ github.repository_owner }} \
+            -F repo=${{ github.event.repository.name }} \
+            -F name="$LABEL" \
+            --jq '.data.repository.label.id' 2>/dev/null || true)
+
+          if [ -z "$LABEL_ID" ]; then
+            echo "Label not found, creating..."
+            gh api repos/${{ github.repository }}/labels \
+              -f name="$LABEL" -f color="0E8A16"
+
+            LABEL_ID=$(gh api graphql -f query='
+              query($repo:String!, $owner:String!, $name:String!) {
+                repository(name:$repo, owner:$owner) {
+                  label(name:$name) { id name }
+                }
+              }' \
+              -F owner=${{ github.repository_owner }} \
+              -F repo=${{ github.event.repository.name }} \
+              -F name="$LABEL" \
+              --jq '.data.repository.label.id')
           fi
 
           echo "Adding label $LABEL to discussion $DISCUSSION_ID..."
           gh api graphql -f query='
-            mutation($id:ID!, $labels:[String!]!) {
-              addLabelsToLabelable(input: {labelableId:$id, labelNames:$labels}) {
+            mutation($id:ID!, $labels:[ID!]!) {
+              addLabelsToLabelable(input: {labelableId:$id, labelIds:$labels}) {
                 clientMutationId
               }
             }' \
             -F id=$DISCUSSION_ID \
-            -F labels="[$LABEL]"
+            -F labels="[$LABEL_ID]"
+
