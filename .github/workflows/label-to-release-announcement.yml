@@ -1,50 +1,33 @@
-name: Label → Release Discussions
+name: Reconcile Release Discussions
 
 on:
-  issues:
-    types: [labeled, edited]
-  pull_request:
-    types: [labeled, edited]
+  schedule:
+    - cron: "0 * * * *" # every hour
 
 permissions:
   contents: read
   discussions: write
-  issues: write
+  issues: read
   pull-requests: read
 
 jobs:
-  ensure-discussions:
+  reconcile:
     runs-on: ubuntu-latest
     steps:
-      - name: Ensure discussions exist for all release/* labels
+      - name: Reconcile release/* labels → discussions
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const categoryName = 'Announcements';
+            const categoryName = "Announcements";
 
-            // Event can be issue or PR
-            const prOrIssue = context.payload.issue || context.payload.pull_request;
-            if (!prOrIssue) {
-              core.info("No issue/PR payload, skipping.");
-              return;
-            }
+            // 24h cutoff
+            const since = new Date(Date.now() - 24*60*60*1000).toISOString();
+            core.info(`Scanning issues/PRs updated since ${since}`);
 
-            // Collect all release/* labels
-            const releaseLabels = (prOrIssue.labels || [])
-              .map(l => l.name)
-              .filter(name => name.startsWith('release/'));
-
-            if (releaseLabels.length === 0) {
-              core.info("No release/* labels, nothing to do.");
-              return;
-            }
-
-            core.info(`Release labels found: ${releaseLabels.join(', ')}`);
-
-            // Get repo + categories
+            // fetch repo + discussion categories
             const repoData = await github.graphql(`
               query($owner:String!, $repo:String!){
                 repository(owner:$owner, name:$repo){
@@ -53,7 +36,6 @@ jobs:
                 }
               }
             `, { owner, repo });
-
             const repoId = repoData.repository.id;
             const category = repoData.repository.discussionCategories.nodes.find(c => c.name === categoryName);
             if (!category) {
@@ -62,108 +44,110 @@ jobs:
             }
             const categoryId = category.id;
 
-            // For each release label → ensure discussion exists
-            for (const labelName of releaseLabels) {
-              const version = labelName.substring('release/'.length);
-              const titleTarget = `Release: ${version}`;
-              core.info(`\n→ Processing ${labelName}`);
+            // paginate issues/PRs updated in last 24h
+            for await (const { data: items } of github.paginate.iterator(
+              github.rest.issues.listForRepo,
+              { owner, repo, state: "all", since, per_page: 100 }
+            )) {
+              for (const item of items) {
+                const releaseLabels = item.labels
+                  .map(l => typeof l === "string" ? (l.name || l) : l)
+                  .filter(n => n.startsWith("release/"));
+                if (releaseLabels.length === 0) continue;
 
-              // Search discussions with pagination
-              let discussionId = null;
-              let cursor = null;
+                core.info(`#${item.number}: ${releaseLabels.join(", ")}`);
 
-              while (true) {
-                const page = await github.graphql(`
-                  query($owner:String!, $repo:String!, $cursor:String){
-                    repository(owner:$owner, name:$repo){
-                      discussions(first:50, after:$cursor){
-                        nodes{
-                          id
-                          title
-                          url
-                          category{ name }
-                          labels(first:50){ nodes{ name } }
+                for (const labelName of releaseLabels) {
+                  const version = labelName.substring("release/".length);
+                  const titleTarget = `Release: ${version}`;
+
+                  // search discussions
+                  let discussionId = null;
+                  let cursor = null;
+                  while (true) {
+                    const page = await github.graphql(`
+                      query($owner:String!, $repo:String!, $cursor:String){
+                        repository(owner:$owner, name:$repo){
+                          discussions(first:50, after:$cursor){
+                            nodes{
+                              id
+                              title
+                              url
+                              category{ name }
+                              labels(first:50){ nodes{ name } }
+                            }
+                            pageInfo{ hasNextPage endCursor }
+                          }
                         }
-                        pageInfo{ hasNextPage endCursor }
+                      }
+                    `, { owner, repo, cursor });
+                    const nodes = page.repository.discussions.nodes;
+                    const byLabel = nodes.find(d =>
+                      d.category?.name === categoryName &&
+                      d.labels?.nodes?.some(l => l.name === labelName)
+                    );
+                    if (byLabel) { discussionId = byLabel.id; break; }
+                    const byTitle = nodes.find(d =>
+                      d.category?.name === categoryName &&
+                      d.title === titleTarget
+                    );
+                    if (byTitle) { discussionId = byTitle.id; break; }
+                    if (!page.repository.discussions.pageInfo.hasNextPage) break;
+                    cursor = page.repository.discussions.pageInfo.endCursor;
+                  }
+
+                  if (!discussionId) {
+                    core.info(`→ Creating discussion for ${labelName}`);
+                    const body =
+                      `# Release ${version}\n\n` +
+                      `### Links\n` +
+                      `- [Issues and pull requests marked for version ${version}](https://github.com/${owner}/${repo}/issues?q=label%3A${encodeURIComponent(labelName)})\n`;
+
+                    const created = await github.graphql(`
+                      mutation($repoId:ID!, $catId:ID!, $title:String!, $body:String!){
+                        createDiscussion(input:{
+                          repositoryId:$repoId,
+                          categoryId:$catId,
+                          title:$title,
+                          body:$body
+                        }){ discussion{ id url } }
+                      }
+                    `, { repoId, catId: categoryId, title: titleTarget, body });
+
+                    discussionId = created.createDiscussion.discussion.id;
+                  } else {
+                    core.info(`→ Found existing discussion for ${labelName}`);
+                  }
+
+                  // ensure label exists
+                  let labelId;
+                  try {
+                    await github.rest.issues.getLabel({ owner, repo, name: labelName });
+                  } catch (e) {
+                    if (e.status === 404) {
+                      await github.rest.issues.createLabel({
+                        owner, repo, name: labelName, color: "0E8A16"
+                      });
+                    } else { throw e; }
+                  }
+                  const labelNode = await github.graphql(`
+                    query($owner:String!, $repo:String!, $name:String!){
+                      repository(owner:$owner, name:$repo){ label(name:$name){ id } }
+                    }
+                  `, { owner, repo, name: labelName });
+                  labelId = labelNode.repository.label?.id;
+                  if (!labelId) continue;
+
+                  // add label to discussion
+                  await github.graphql(`
+                    mutation($id:ID!, $labels:[ID!]!){
+                      addLabelsToLabelable(input:{ labelableId:$id, labelIds:$labels }) {
+                        clientMutationId
                       }
                     }
-                  }
-                `, { owner, repo, cursor });
+                  `, { id: discussionId, labels: [labelId] });
 
-                const nodes = page.repository.discussions.nodes;
-
-                const byLabel = nodes.find(d =>
-                  d.category?.name === categoryName &&
-                  d.labels?.nodes?.some(l => l.name === labelName)
-                );
-                if (byLabel) { discussionId = byLabel.id; break; }
-
-                const byTitle = nodes.find(d =>
-                  d.category?.name === categoryName &&
-                  d.title === titleTarget
-                );
-                if (byTitle) { discussionId = byTitle.id; break; }
-
-                if (!page.repository.discussions.pageInfo.hasNextPage) break;
-                cursor = page.repository.discussions.pageInfo.endCursor;
-              }
-
-              if (!discussionId) {
-                core.info(`No discussion for ${labelName} — creating…`);
-                const body =
-                  `# Release ${version}\n\n` +
-                  `### Links\n` +
-                  `- [Issues and pull requests marked for version ${version}](https://github.com/${owner}/${repo}/issues?q=label%3A${encodeURIComponent(labelName)})\n`;
-
-                const created = await github.graphql(`
-                  mutation($repoId:ID!, $catId:ID!, $title:String!, $body:String!){
-                    createDiscussion(input:{
-                      repositoryId:$repoId,
-                      categoryId:$catId,
-                      title:$title,
-                      body:$body
-                    }){ discussion{ id url } }
-                  }
-                `, { repoId, catId: categoryId, title: titleTarget, body });
-
-                discussionId = created.createDiscussion.discussion.id;
-                core.info(`Created discussion ${discussionId}`);
-              } else {
-                core.info(`Reusing discussion ${discussionId}`);
-              }
-
-              // Ensure label exists in repo
-              let labelId;
-              try {
-                await github.rest.issues.getLabel({ owner, repo, name: labelName });
-              } catch (e) {
-                if (e.status === 404) {
-                  core.info(`Label ${labelName} missing — creating…`);
-                  await github.rest.issues.createLabel({
-                    owner, repo, name: labelName, color: '0E8A16'
-                  });
-                } else { throw e; }
-              }
-              const labelNode = await github.graphql(`
-                query($owner:String!, $repo:String!, $name:String!){
-                  repository(owner:$owner, name:$repo){ label(name:$name){ id } }
+                  core.info(`✓ ${labelName} attached to discussion`);
                 }
-              `, { owner, repo, name: labelName });
-              labelId = labelNode.repository.label?.id;
-
-              if (!labelId) {
-                core.setFailed(`Could not resolve label ID for ${labelName}`);
-                return;
               }
-
-              // Add label to discussion
-              await github.graphql(`
-                mutation($id:ID!, $labels:[ID!]!){
-                  addLabelsToLabelable(input:{ labelableId:$id, labelIds:$labels }) {
-                    clientMutationId
-                  }
-                }
-              `, { id: discussionId, labels: [labelId] });
-
-              core.info(`✓ ${labelName} attached to discussion`);
             }
