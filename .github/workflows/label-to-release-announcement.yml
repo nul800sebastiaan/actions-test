@@ -99,7 +99,7 @@ jobs:
                   if (!discussionId) {
                     core.info(`→ Creating discussion for ${labelName}`);
                     const body =
-                      `**Release date:** TODO (YYY-MM-DD)\n\n` +
+                      `**Release date:** TODO (YYYY-MM-DD)\n\n` +
                       `### Links\n` +
                       `- [Issues and pull requests marked for version ${version}](https://github.com/${owner}/${repo}/issues?q=label%3A${encodeURIComponent(labelName)})\n`;
 
