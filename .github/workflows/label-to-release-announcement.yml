@@ -115,6 +115,16 @@ jobs:
                     `, { repoId, catId: categoryId, title: titleTarget, body });
 
                     discussionId = created.createDiscussion.discussion.id;
+
+                    // lock the discussion to prevent replies
+                    await github.graphql(`
+                      mutation($id:ID!){
+                        lockLockable(input:{ lockableId:$id }) {
+                          clientMutationId
+                        }
+                      }
+                    `, { id: discussionId });
+                    core.info(`🔒 Locked discussion ${discussionId}`);
                   } else {
                     core.info(`→ Found existing discussion for ${labelName}`);
                   }
