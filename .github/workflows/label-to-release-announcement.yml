@@ -3,6 +3,8 @@ name: Auto-create Release Discussion
 on:
   pull_request:
     types: [labeled]
+  issues:
+    types: [labeled]
 
 jobs:
   create-discussion:
