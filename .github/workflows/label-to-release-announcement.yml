@@ -101,13 +101,10 @@ jobs:
             if (!discussionId) {
               core.info('No existing discussion — creating…');
               const body =
-                `**Release version:** ${version}  \n` +
                 `**Release date:** TODO (YYYY-MM-DD)  \n` +
                 `**Status:** TODO\n\n` +
-                `### Highlights\n\n` +
-                `### Community contributions\n\n` +
                 `### Links\n` +
-                `- [Pull requests with ${labelName}](https://github.com/${owner}/${repo}/pulls?q=label%3A${encodeURIComponent(labelName)})\n`;
+                `- [Issues and pull requests with ${labelName}](https://github.com/${owner}/${repo}/issues?q=label%3A${encodeURIComponent(labelName)})\n`;
 
               const created = await github.graphql(`
                 mutation($repoId:ID!, $catId:ID!, $title:String!, $body:String!){
