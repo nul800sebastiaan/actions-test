@@ -108,7 +108,7 @@ jobs:
                   `**Release date:** TODO (YYYY-MM-DD)  \n` +
                   `**Status:** TODO\n\n` +
                   `### Links\n` +
-                  `- [Issues and pull requests marked for release ${version}](https://github.com/${owner}/${repo}/pulls?q=label%3A${encodeURIComponent(labelName)})\n`;
+                  `- [Issues and pull requests marked for release ${version}](https://github.com/${owner}/${repo}/issues?q=label%3A${encodeURIComponent(labelName)})\n`;
 
                 const created = await github.graphql(`
                   mutation($repoId:ID!, $catId:ID!, $title:String!, $body:String!){
