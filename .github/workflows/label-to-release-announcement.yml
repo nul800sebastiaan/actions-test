@@ -1,10 +1,10 @@
 name: Label → Release Discussions
 
 on:
-  pull_request:
-    types: [labeled]
   issues:
-    types: [labeled]
+    types: [labeled, edited]
+  pull_request:
+    types: [labeled, edited]
 
 permissions:
   contents: read
@@ -13,7 +13,7 @@ permissions:
   pull-requests: read
 
 jobs:
-  create-discussions:
+  ensure-discussions:
     runs-on: ubuntu-latest
     steps:
       - name: Ensure discussions exist for all release/* labels
@@ -25,19 +25,26 @@ jobs:
             const repo = context.repo.repo;
             const categoryName = 'Announcements';
 
-            // Grab labels on this issue/PR
+            // Event can be issue or PR
             const prOrIssue = context.payload.issue || context.payload.pull_request;
+            if (!prOrIssue) {
+              core.info("No issue/PR payload, skipping.");
+              return;
+            }
+
+            // Collect all release/* labels
             const releaseLabels = (prOrIssue.labels || [])
               .map(l => l.name)
               .filter(name => name.startsWith('release/'));
 
             if (releaseLabels.length === 0) {
-              core.info('No release/* labels found, skipping.');
+              core.info("No release/* labels, nothing to do.");
               return;
             }
-            core.info(`Release labels: ${releaseLabels.join(', ')}`);
 
-            // Get repo id + categories
+            core.info(`Release labels found: ${releaseLabels.join(', ')}`);
+
+            // Get repo + categories
             const repoData = await github.graphql(`
               query($owner:String!, $repo:String!){
                 repository(owner:$owner, name:$repo){
@@ -55,13 +62,13 @@ jobs:
             }
             const categoryId = category.id;
 
-            // For each release label → ensure a discussion exists
+            // For each release label → ensure discussion exists
             for (const labelName of releaseLabels) {
               const version = labelName.substring('release/'.length);
               const titleTarget = `Release: ${version}`;
               core.info(`\n→ Processing ${labelName}`);
 
-              // Paginate discussions to look for one
+              // Search discussions with pagination
               let discussionId = null;
               let cursor = null;
 
@@ -102,13 +109,11 @@ jobs:
               }
 
               if (!discussionId) {
-                core.info(`No discussion found for ${labelName} — creating one…`);
+                core.info(`No discussion for ${labelName} — creating…`);
                 const body =
-                  `**Release version:** ${version}  \n` +
-                  `**Release date:** TODO (YYYY-MM-DD)  \n` +
-                  `**Status:** TODO\n\n` +
+                  `# Release ${version}\n\n` +
                   `### Links\n` +
-                  `- [Issues and pull requests marked for release ${version}](https://github.com/${owner}/${repo}/issues?q=label%3A${encodeURIComponent(labelName)})\n`;
+                  `- [Issues and pull requests marked for version ${version}](https://github.com/${owner}/${repo}/issues?q=label%3A${encodeURIComponent(labelName)})\n`;
 
                 const created = await github.graphql(`
                   mutation($repoId:ID!, $catId:ID!, $title:String!, $body:String!){
@@ -124,10 +129,10 @@ jobs:
                 discussionId = created.createDiscussion.discussion.id;
                 core.info(`Created discussion ${discussionId}`);
               } else {
-                core.info(`Reusing existing discussion ${discussionId}`);
+                core.info(`Reusing discussion ${discussionId}`);
               }
 
-              // Ensure repo label exists
+              // Ensure label exists in repo
               let labelId;
               try {
                 await github.rest.issues.getLabel({ owner, repo, name: labelName });
@@ -145,12 +150,13 @@ jobs:
                 }
               `, { owner, repo, name: labelName });
               labelId = labelNode.repository.label?.id;
+
               if (!labelId) {
                 core.setFailed(`Could not resolve label ID for ${labelName}`);
                 return;
               }
 
-              // Attach label to discussion
+              // Add label to discussion
               await github.graphql(`
                 mutation($id:ID!, $labels:[ID!]!){
                   addLabelsToLabelable(input:{ labelableId:$id, labelIds:$labels }) {
