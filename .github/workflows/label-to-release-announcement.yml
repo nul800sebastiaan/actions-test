@@ -1,4 +1,4 @@
-name: Auto-create Release Discussion
+name: Label → Release Discussion
 
 on:
   pull_request:
@@ -6,176 +6,162 @@ on:
   issues:
     types: [labeled]
 
+# Required so GITHUB_TOKEN can create discussions and read labels
+permissions:
+  contents: read
+  discussions: write
+  issues: read
+  pull-requests: read
+
 jobs:
   create-discussion:
     if: startsWith(github.event.label.name, 'release/')
     runs-on: ubuntu-latest
     steps:
-      - name: Extract version from label
-        id: extract
-        run: |
-          LABEL_NAME="${{ github.event.label.name }}"
-          VERSION="${LABEL_NAME#release/}"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Check or create Discussion
-        id: discussion
+      - name: Create or reuse Release Discussion
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          REPO_FULL: ${{ github.repository }}
+          CATEGORY_NAME: Announcements
         run: |
-          VERSION="${{ steps.extract.outputs.version }}"
-          LABEL="release/$VERSION"
+          set -Eeuo pipefail
 
-          echo "Looking for existing discussion in Announcements with label $LABEL..."
+          LABEL_NAME="${{ github.event.label.name }}"
+          VERSION="${LABEL_NAME#release/}"
+          LABEL="release/$VERSION"
+          echo "→ Version: $VERSION  Label: $LABEL"
+
+          echo "→ Scanning discussions in category '${CATEGORY_NAME}' for existing '$LABEL'…"
           DISCUSSION_ID=""
           CURSOR="null"
 
           while true; do
-            PAGE=$(gh api graphql -f query='
-              query($repo: String!, $owner: String!, $cursor: String) {
-                repository(name: $repo, owner: $owner) {
+            PAGE="$(gh api graphql -f query='
+              query($owner:String!, $repo:String!, $cursor:String) {
+                repository(owner:$owner, name:$repo) {
                   discussions(first: 50, after: $cursor) {
                     nodes {
                       id
-                      url
                       title
+                      url
                       category { name }
-                      labels(first: 20) { nodes { name } }
+                      labels(first: 50) { nodes { name } }
                     }
-                    pageInfo {
-                      hasNextPage
-                      endCursor
-                    }
+                    pageInfo { hasNextPage endCursor }
                   }
                 }
-              }' \
-              -F owner=${{ github.repository_owner }} \
-              -F repo=${{ github.event.repository.name }} \
-              -F cursor="$CURSOR")
+              }' -F owner="$OWNER" -F repo="$REPO" -F cursor="$CURSOR")"
 
-            MATCH=$(echo "$PAGE" | jq -r --arg LABEL "$LABEL" '
-              .data.repository.discussions.nodes[]
-              | select(.category.name=="Announcements")
-              | select(.labels.nodes[].name == $LABEL)
-              | .id' | head -n1)
+            # match by category + label
+            MATCH_ID="$(printf "%s" "$PAGE" \
+              | jq -r --arg L "$LABEL" --arg C "$CATEGORY_NAME" '
+                  .data.repository.discussions.nodes[]
+                  | select(.category.name == $C)
+                  | select(.labels.nodes[].name? == $L)
+                  | .id' | head -n1)"
 
-            if [ -n "$MATCH" ]; then
-              DISCUSSION_ID="$MATCH"
-              echo "Found existing discussion: $DISCUSSION_ID"
+            if [ -n "${MATCH_ID:-}" ]; then
+              DISCUSSION_ID="$MATCH_ID"
+              echo "→ Found existing discussion by label: $DISCUSSION_ID"
               break
             fi
 
-            HAS_NEXT=$(echo "$PAGE" | jq -r '.data.repository.discussions.pageInfo.hasNextPage')
+            # secondary guard: match by title "Release: X.Y.Z"
+            MATCH_TITLE_ID="$(printf "%s" "$PAGE" \
+              | jq -r --arg T "Release: $VERSION" --arg C "$CATEGORY_NAME" '
+                  .data.repository.discussions.nodes[]
+                  | select(.category.name == $C)
+                  | select(.title == $T)
+                  | .id' | head -n1)"
+
+            if [ -n "${MATCH_TITLE_ID:-}" ]; then
+              DISCUSSION_ID="$MATCH_TITLE_ID"
+              echo "→ Found existing discussion by title: $DISCUSSION_ID"
+              break
+            fi
+
+            HAS_NEXT="$(printf "%s" "$PAGE" | jq -r '.data.repository.discussions.pageInfo.hasNextPage')"
             if [ "$HAS_NEXT" != "true" ]; then
               break
             fi
-            CURSOR=$(echo "$PAGE" | jq -r '.data.repository.discussions.pageInfo.endCursor')
+            CURSOR="$(printf "%s" "$PAGE" | jq -r '.data.repository.discussions.pageInfo.endCursor')"
           done
 
-          if [ -n "$DISCUSSION_ID" ]; then
-            echo "discussionId=$DISCUSSION_ID" >> $GITHUB_OUTPUT
-            exit 0
+          if [ -z "$DISCUSSION_ID" ]; then
+            echo "→ None found. Creating a new discussion…"
+
+            REPO_ID="$(gh api graphql -f query='
+              query($owner:String!, $repo:String!) {
+                repository(owner:$owner, name:$repo) { id }
+              }' -F owner="$OWNER" -F repo="$REPO" --jq '.data.repository.id')"
+
+            CATEGORY_ID="$(gh api graphql -f query='
+              query($owner:String!, $repo:String!) {
+                repository(owner:$owner, name:$repo) {
+                  discussionCategories(first: 100) { nodes { id name } }
+                }
+              }' -F owner="$OWNER" -F repo="$REPO" \
+                --jq ".data.repository.discussionCategories.nodes[] | select(.name==\"$CATEGORY_NAME\") | .id")"
+
+            if [ -z "$CATEGORY_ID" ]; then
+              echo "✖ Discussion category '$CATEGORY_NAME' not found"; exit 1
+            fi
+
+            # Build body with REAL newlines
+            BODY="$(cat <<EOF
+            **Release version:** $VERSION  
+            **Release date:** TODO (YYYY-MM-DD)  
+            **Status:** TODO
+            
+            ### Highlights
+            
+            ### Community contributions
+            
+            ### Links
+            - [Pull requests with $LABEL](https://github.com/$REPO_FULL/pulls?q=label%3A$LABEL)
+            EOF
+            )"
+            DISCUSSION_ID="$(gh api graphql -f query='
+              mutation($repo:ID!, $cat:ID!, $title:String!, $body:String!) {
+                createDiscussion(input: {
+                  repositoryId: $repo,
+                  categoryId: $cat,
+                  title: $title,
+                  body: $body
+                }) { discussion { id url } }
+              }' \
+              -F repo="$REPO_ID" \
+              -F cat="$CATEGORY_ID" \
+              -F title="Release: $VERSION" \
+              -F body="$BODY" \
+              --jq '.data.createDiscussion.discussion.id')"
+
+            echo "→ Created discussion: $DISCUSSION_ID"
           fi
 
-          echo "No discussion found — creating one..."
+          echo "DISCUSSION_ID=$DISCUSSION_ID" >> "$GITHUB_ENV"
 
-          REPO_ID=$(gh api graphql -f query='
-            query($repo: String!, $owner: String!) {
-              repository(name: $repo, owner: $owner) { id }
-            }' \
-            -F owner=${{ github.repository_owner }} \
-            -F repo=${{ github.event.repository.name }} \
-            --jq '.data.repository.id')
-
-          CATEGORY_ID=$(gh api graphql -f query='
-            query($repo: String!, $owner: String!) {
-              repository(name: $repo, owner: $owner) {
-                discussionCategories(first: 50) {
-                  nodes { id name }
-                }
-              }
-            }' \
-            -F owner=${{ github.repository_owner }} \
-            -F repo=${{ github.event.repository.name }} \
-            --jq '.data.repository.discussionCategories.nodes[] | select(.name=="Announcements") | .id')
-
-          BODY=$(cat <<EOF
-**Release version:** $VERSION  
-**Release date:** TODO (YYYY-MM-DD)  
-**Status:** TODO
-
-### Highlights
-
-### Community contributions
-
-### Links
-- [Pull requests with $LABEL](https://github.com/${{ github.repository }}/pulls?q=label%3A$LABEL)
-EOF
-)
-
-          DISCUSSION_ID=$(gh api graphql -f query='
-            mutation($repo:ID!, $cat:ID!, $title:String!, $body:String!) {
-              createDiscussion(input: {
-                repositoryId: $repo,
-                categoryId: $cat,
-                title: $title,
-                body: $body
-              }) {
-                discussion { id url }
-              }
-            }' \
-            -F repo=$REPO_ID \
-            -F cat=$CATEGORY_ID \
-            -F title="Release: $VERSION" \
-            -F body="$BODY" \
-            --jq '.data.createDiscussion.discussion.id')
-
-          echo "discussionId=$DISCUSSION_ID" >> $GITHUB_OUTPUT
-
-      - name: Add label to discussion
-        if: steps.discussion.outputs.discussionId != ''
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION="${{ steps.extract.outputs.version }}"
-          LABEL="release/$VERSION"
-          DISCUSSION_ID="${{ steps.discussion.outputs.discussionId }}"
-
-          echo "Ensuring label $LABEL exists..."
-          LABEL_ID=$(gh api graphql -f query='
-            query($repo:String!, $owner:String!, $name:String!) {
-              repository(name:$repo, owner:$owner) {
-                label(name:$name) { id name }
-              }
-            }' \
-            -F owner=${{ github.repository_owner }} \
-            -F repo=${{ github.event.repository.name }} \
-            -F name="$LABEL" \
-            --jq '.data.repository.label.id' 2>/dev/null || true)
+          echo "→ Ensuring repo label '$LABEL' exists and has ID…"
+          LABEL_ID="$(gh api graphql -f query='
+            query($owner:String!, $repo:String!, $name:String!) {
+              repository(owner:$owner, name:$repo) { label(name:$name) { id name } }
+            }' -F owner="$OWNER" -F repo="$REPO" -F name="$LABEL" \
+            --jq '.data.repository.label.id' 2>/dev/null || true)"
 
           if [ -z "$LABEL_ID" ]; then
-            echo "Label not found, creating..."
-            gh api repos/${{ github.repository }}/labels \
-              -f name="$LABEL" -f color="0E8A16"
-
-            LABEL_ID=$(gh api graphql -f query='
-              query($repo:String!, $owner:String!, $name:String!) {
-                repository(name:$repo, owner:$owner) {
-                  label(name:$name) { id name }
-                }
-              }' \
-              -F owner=${{ github.repository_owner }} \
-              -F repo=${{ github.event.repository.name }} \
-              -F name="$LABEL" \
-              --jq '.data.repository.label.id')
+            gh api "repos/$REPO_FULL/labels" -f name="$LABEL" -f color="0E8A16" >/dev/null
+            LABEL_ID="$(gh api graphql -f query='
+              query($owner:String!, $repo:String!, $name:String!) {
+                repository(owner:$owner, name:$repo) { label(name:$name) { id } }
+              }' -F owner="$OWNER" -F repo="$REPO" -F name="$LABEL" --jq '.data.repository.label.id')"
           fi
 
-          echo "Adding label $LABEL to discussion $DISCUSSION_ID..."
+          echo "→ Applying label to discussion…"
           gh api graphql -f query='
             mutation($id:ID!, $labels:[ID!]!) {
-              addLabelsToLabelable(input: {labelableId:$id, labelIds:$labels}) {
-                clientMutationId
-              }
-            }' \
-            -F id=$DISCUSSION_ID \
-            -F labels[]=$LABEL_ID
+              addLabelsToLabelable(input:{ labelableId:$id, labelIds:$labels }) { clientMutationId }
+            }' -F id="$DISCUSSION_ID" -F labels[]="$LABEL_ID"
+
+          echo "✓ Done."
