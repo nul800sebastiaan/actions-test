@@ -18,7 +18,7 @@ jobs:
           VERSION="${LABEL_NAME#release/}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Create Discussion if missing
+      - name: Check or create Discussion
         id: discussion
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -26,28 +26,56 @@ jobs:
           VERSION="${{ steps.extract.outputs.version }}"
           LABEL="release/$VERSION"
 
-          echo "Checking for existing discussion with label $LABEL..."
+          echo "Looking for existing discussion with label $LABEL..."
+          DISCUSSION_ID=""
+          CURSOR="null"
 
-          EXISTING=$(gh api graphql -f query='
-            query($repo: String!, $owner: String!, $label: [String!]) {
-              repository(name: $repo, owner: $owner) {
-                discussions(labels: $label, first: 1) {
-                  nodes { id url }
+          while true; do
+            PAGE=$(gh api graphql -f query='
+              query($repo: String!, $owner: String!, $cat: String!, $cursor: String) {
+                repository(name: $repo, owner: $owner) {
+                  discussions(first: 50, category: {name: $cat}, after: $cursor) {
+                    nodes {
+                      id
+                      url
+                      labels(first: 20) { nodes { name } }
+                    }
+                    pageInfo {
+                      hasNextPage
+                      endCursor
+                    }
+                  }
                 }
-              }
-            }' \
-            -F owner=${{ github.repository_owner }} \
-            -F repo=${{ github.event.repository.name }} \
-            -F label="$LABEL" \
-            --jq '.data.repository.discussions.nodes[0].id')
+              }' \
+              -F owner=${{ github.repository_owner }} \
+              -F repo=${{ github.event.repository.name }} \
+              -F cat="Announcements" \
+              -F cursor="$CURSOR")
 
-          if [ -n "$EXISTING" ]; then
-            echo "Discussion already exists"
-            echo "discussionId=$EXISTING" >> $GITHUB_OUTPUT
+            MATCH=$(echo "$PAGE" | jq -r --arg LABEL "$LABEL" '
+              .data.repository.discussions.nodes[]
+              | select(.labels.nodes[].name == $LABEL)
+              | .id' | head -n1)
+
+            if [ -n "$MATCH" ]; then
+              DISCUSSION_ID="$MATCH"
+              echo "Found existing discussion: $DISCUSSION_ID"
+              break
+            fi
+
+            HAS_NEXT=$(echo "$PAGE" | jq -r '.data.repository.discussions.pageInfo.hasNextPage')
+            if [ "$HAS_NEXT" != "true" ]; then
+              break
+            fi
+            CURSOR=$(echo "$PAGE" | jq -r '.data.repository.discussions.pageInfo.endCursor')
+          done
+
+          if [ -n "$DISCUSSION_ID" ]; then
+            echo "discussionId=$DISCUSSION_ID" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          echo "Creating new discussion for $VERSION..."
+          echo "No discussion found — creating one..."
 
           REPO_ID=$(gh api graphql -f query='
             query($repo: String!, $owner: String!) {
@@ -60,7 +88,7 @@ jobs:
           CATEGORY_ID=$(gh api graphql -f query='
             query($repo: String!, $owner: String!) {
               repository(name: $repo, owner: $owner) {
-                discussionCategories(first: 20) {
+                discussionCategories(first: 50) {
                   nodes { id name }
                 }
               }
@@ -98,13 +126,14 @@ jobs:
           DISCUSSION_ID="${{ steps.discussion.outputs.discussionId }}"
 
           echo "Ensuring label $LABEL exists..."
-          gh api repos/${{ github.repository }}/labels/$LABEL || \
+          if ! gh api repos/${{ github.repository }}/labels/$LABEL > /dev/null 2>&1; then
             gh api repos/${{ github.repository }}/labels -f name="$LABEL" -f color="0E8A16"
+          fi
 
           echo "Adding label $LABEL to discussion $DISCUSSION_ID..."
           gh api graphql -f query='
             mutation($id:ID!, $labels:[String!]!) {
-              addLabelsToLabelable(input: {labelableId:$id, labelIds:[] , labelNames:$labels}) {
+              addLabelsToLabelable(input: {labelableId:$id, labelNames:$labels}) {
                 clientMutationId
               }
             }' \
