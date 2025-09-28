@@ -26,18 +26,20 @@ jobs:
           VERSION="${{ steps.extract.outputs.version }}"
           LABEL="release/$VERSION"
 
-          echo "Looking for existing discussion with label $LABEL..."
+          echo "Looking for existing discussion in Announcements with label $LABEL..."
           DISCUSSION_ID=""
           CURSOR="null"
 
           while true; do
             PAGE=$(gh api graphql -f query='
-              query($repo: String!, $owner: String!, $cat: String!, $cursor: String) {
+              query($repo: String!, $owner: String!, $cursor: String) {
                 repository(name: $repo, owner: $owner) {
-                  discussions(first: 50, category: {name: $cat}, after: $cursor) {
+                  discussions(first: 50, after: $cursor) {
                     nodes {
                       id
                       url
+                      title
+                      category { name }
                       labels(first: 20) { nodes { name } }
                     }
                     pageInfo {
@@ -49,11 +51,11 @@ jobs:
               }' \
               -F owner=${{ github.repository_owner }} \
               -F repo=${{ github.event.repository.name }} \
-              -F cat="Announcements" \
               -F cursor="$CURSOR")
 
             MATCH=$(echo "$PAGE" | jq -r --arg LABEL "$LABEL" '
               .data.repository.discussions.nodes[]
+              | select(.category.name=="Announcements")
               | select(.labels.nodes[].name == $LABEL)
               | .id' | head -n1)
 
