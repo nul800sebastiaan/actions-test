@@ -99,6 +99,20 @@ jobs:
             -F repo=${{ github.event.repository.name }} \
             --jq '.data.repository.discussionCategories.nodes[] | select(.name=="Announcements") | .id')
 
+          BODY=$(cat <<EOF
+**Release version:** $VERSION  
+**Release date:** TODO (YYYY-MM-DD)  
+**Status:** TODO
+
+### Highlights
+
+### Community contributions
+
+### Links
+- [Pull requests with $LABEL](https://github.com/${{ github.repository }}/pulls?q=label%3A$LABEL)
+EOF
+)
+
           DISCUSSION_ID=$(gh api graphql -f query='
             mutation($repo:ID!, $cat:ID!, $title:String!, $body:String!) {
               createDiscussion(input: {
@@ -113,7 +127,7 @@ jobs:
             -F repo=$REPO_ID \
             -F cat=$CATEGORY_ID \
             -F title="Release: $VERSION" \
-            -F body="**Release version:** $VERSION  **Release date:** TODO (YYYY-MM-DD)  **Status:** TODO  ### Highlights  ### Community contributions  ### Links  - [Pull requests with $LABEL](https://github.com/${{ github.repository }}/pulls?q=label%3A$LABEL)" \
+            -F body="$BODY" \
             --jq '.data.createDiscussion.discussion.id')
 
           echo "discussionId=$DISCUSSION_ID" >> $GITHUB_OUTPUT
@@ -164,5 +178,4 @@ jobs:
               }
             }' \
             -F id=$DISCUSSION_ID \
-            -F labels="[$LABEL_ID]"
-
+            -F labels[]=$LABEL_ID
