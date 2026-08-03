@@ -1,0 +1,14 @@
+name: Debug all events
+on:
+  issues:
+    types: [labeled]
+  pull_request:
+    types: [labeled]
+
+jobs:
+  log:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          EVENT_JSON: ${{ toJson(github.event) }}
+        run: echo "$EVENT_JSON"
