@@ -152,7 +152,7 @@ jobs:
             const dedent = str => str.split('\n').map(l => l.trimStart()).join('\n');
 
             const commentBody = dedent(templates[templateKey])
-              .replaceAll('{{issueowner}}', author)
+              .replaceAll('{{issueowner}}', `@${author}`)
               .replaceAll('{{issuenumber}}', String(issueNumber))
               + `\n\n${marker}`;
 
