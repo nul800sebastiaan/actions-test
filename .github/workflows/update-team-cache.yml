@@ -8,6 +8,8 @@ on:
 jobs:
   cache-teams:
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - name: Fetch org teams and save to JSON
         uses: actions/github-script@v9
@@ -21,12 +23,12 @@ jobs:
 
             // "hq-only-teams" is the parent team; GitHub's list-team-members API
             // includes members of its child teams, so this one slug covers all of them.
-            // TODO: verify this is the exact slug (Settings > Teams on GitHub).
             const excludedTeams = [
               'hq-only-teams',
             ];
 
             const excludedUsers = new Set();
+            let hadError = false;
 
             for (const team_slug of excludedTeams) {
               try {
@@ -39,7 +41,16 @@ jobs:
                 core.info(`Fetched ${members.length} members from team: ${team_slug}`);
               } catch (err) {
                 core.error(`Failed to fetch team ${team_slug}: ${err.message}`);
+                hadError = true;
               }
+            }
+
+            if (hadError) {
+              // Don't cache a partial/incomplete exclusion list — that risks
+              // an HQ author getting an automated response until the next
+              // successful sync.
+              core.setFailed('Failed to fetch one or more teams; not caching a possibly-incomplete exclusion list.');
+              return;
             }
 
             const uniqueList = Array.from(excludedUsers);

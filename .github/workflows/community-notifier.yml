@@ -17,6 +17,7 @@ jobs:
     permissions:
       issues: write
       pull-requests: write
+      actions: read
     steps:
       - name: Restore cached team list
         uses: actions/cache/restore@v6
@@ -44,6 +45,7 @@ jobs:
             ];
 
             const excludedUsers = new Set();
+            let hadError = false;
 
             for (const team_slug of excludedTeams) {
               try {
@@ -55,7 +57,15 @@ jobs:
                 members.forEach(m => excludedUsers.add(m.login.toLowerCase()));
               } catch (err) {
                 core.error(`Failed to fetch team ${team_slug}: ${err.message}`);
+                hadError = true;
               }
+            }
+
+            if (hadError) {
+              // Don't comment with a possibly-incomplete exclusion list — that
+              // risks an HQ author getting an automated response.
+              core.setFailed('Failed to fetch one or more teams live; skipping comment this run.');
+              return;
             }
 
             core.warning('Cache miss — fetched team memberships live for this run.');
@@ -104,7 +114,7 @@ jobs:
             While we wait for someone to have a look at your work, we wanted to let you know about that we have a checklist for some of the things we will consider during review:
 
             - It's clear what problem this is solving, there's a connected issue or a description of what the changes do and how to test them
-            - The automated tests all pass (see "[Checks]({{issuenumber}}/checks)" tab on this PR)
+            - The automated tests all pass (see "[Checks]({{checksurl}})" tab on this PR)
             - The level of security for this contribution is the same or improved
             - The level of performance for this contribution is the same or improved
             - Avoids introducing [unwanted changes](https://docs.umbraco.com/contributing/umbraco-cms/contributing/unwanted-changes); note that behavioral changes might also be perceived as breaking
@@ -151,9 +161,12 @@ jobs:
             // block; strip that leading whitespace back out line by line.
             const dedent = str => str.split('\n').map(l => l.trimStart()).join('\n');
 
+            const checksUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/pull/${issueNumber}/checks`;
+
             const commentBody = dedent(templates[templateKey])
               .replaceAll('{{issueowner}}', `@${author}`)
               .replaceAll('{{issuenumber}}', String(issueNumber))
+              .replaceAll('{{checksurl}}', checksUrl)
               + `\n\n${marker}`;
 
             await github.rest.issues.createComment({
