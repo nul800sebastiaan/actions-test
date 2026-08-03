@@ -109,7 +109,7 @@ jobs:
             - The level of performance for this contribution is the same or improved
             - Avoids introducing [unwanted changes](https://docs.umbraco.com/contributing/umbraco-cms/contributing/unwanted-changes); note that behavioral changes might also be perceived as breaking
             - Have a look at [what to check before you start](https://docs.umbraco.com/contributing/umbraco-cms/contributing/before-you-start) contributing; if this is a larger PR, it's best to discuss it with Umbraco HQ first
-            - [ ] 💡 The contribution looks original and the [contributor is presumably allowed to share it](https://github.com/umbraco/Umbraco-CMS/blob/v9/contrib/.github/CONTRIBUTING.md#ownership-and-copyright)
+            - [ ] 💡 The contribution looks original and the [contributor is presumably allowed to share it](https://docs.umbraco.com/contributing/umbraco-cms/contributing/before-you-start#ownership-and-copyright)
 
             Don't worry if you got something wrong. We like to think of a pull request as the start of a conversation, we're happy to provide guidance on improving your contribution.
 
