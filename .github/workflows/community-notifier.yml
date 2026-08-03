@@ -130,10 +130,11 @@ jobs:
               ? `issues-${context.payload.action}`
               : context.eventName;
 
-            // Each comment carries a hidden marker so we never post the same
-            // automated response twice on the same issue/PR (e.g. if a label
-            // is removed and re-applied).
-            const marker = `<!-- community-notifier:${templateKey} -->`;
+            // Each comment carries a hidden marker so we never post more than
+            // one automated response on the same issue/PR, regardless of
+            // which template it was (opened, labeled, re-labeled, etc).
+            const markerPrefix = '<!-- community-notifier:';
+            const marker = `${markerPrefix}${templateKey} -->`;
 
             const existingComments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
@@ -141,8 +142,8 @@ jobs:
               issue_number: issueNumber,
               per_page: 100
             });
-            if (existingComments.some(c => c.body?.includes(marker))) {
-              core.info(`Already posted the ${templateKey} response on #${issueNumber}. Skipping.`);
+            if (existingComments.some(c => c.body?.includes(markerPrefix))) {
+              core.info(`Already posted an automated response on #${issueNumber}. Skipping.`);
               return;
             }
 
