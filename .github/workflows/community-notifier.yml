@@ -101,14 +101,14 @@ jobs:
 
               'pull_request_target': `Hi there {{issueowner}}, thank you for this contribution! 👍
 
-            While we wait for one of the [Core Collaborators team](https://community.umbraco.com/community-teams/the-core-collaborators/) to have a look at your work, we wanted to let you know about that we have a checklist for some of the things we will consider during review:
+            While we wait for someone to have a look at your work, we wanted to let you know about that we have a checklist for some of the things we will consider during review:
 
             - It's clear what problem this is solving, there's a connected issue or a description of what the changes do and how to test them
             - The automated tests all pass (see "[Checks]({{issuenumber}}/checks)" tab on this PR)
             - The level of security for this contribution is the same or improved
             - The level of performance for this contribution is the same or improved
-            - Avoids creating [breaking changes](https://our.umbraco.com/Documentation/Development-Guidelines/breaking-changes); note that behavioral changes might also be perceived as breaking
-            - If this is [a new feature, Umbraco HQ provided guidance](https://github.com/umbraco/Umbraco-CMS/blob/v9/contrib/.github/CONTRIBUTION_GUIDELINES.md) on the implementation beforehand
+            - Avoids introducing [unwanted changes](https://docs.umbraco.com/contributing/umbraco-cms/contributing/unwanted-changes); note that behavioral changes might also be perceived as breaking
+            - Have a look at [what to check before you start](https://docs.umbraco.com/contributing/umbraco-cms/contributing/before-you-start) contributing; if this is a larger PR, it's best to discuss it with Umbraco HQ first
             - [ ] 💡 The contribution looks original and the [contributor is presumably allowed to share it](https://github.com/umbraco/Umbraco-CMS/blob/v9/contrib/.github/CONTRIBUTING.md#ownership-and-copyright)
 
             Don't worry if you got something wrong. We like to think of a pull request as the start of a conversation, we're happy to provide guidance on improving your contribution.
