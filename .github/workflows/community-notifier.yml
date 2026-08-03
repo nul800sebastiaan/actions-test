@@ -80,11 +80,19 @@ jobs:
             const author = (context.payload.issue || context.payload.pull_request).user.login;
             const issueNumber = (context.payload.issue || context.payload.pull_request).number;
 
-            let excludedUsers = [];
-            if (fs.existsSync('team-members.json')) {
-              excludedUsers = JSON.parse(fs.readFileSync('team-members.json', 'utf8'));
-            } else {
-              core.warning('team-members.json not found; proceeding as if no users are excluded.');
+            if (!fs.existsSync('team-members.json')) {
+              // Fail closed, consistent with the cache-miss fallback step:
+              // never comment without a confirmed exclusion list, or an HQ
+              // author could slip through and get an automated response.
+              core.setFailed('team-members.json not found; skipping comment this run.');
+              return;
+            }
+            const excludedUsers = JSON.parse(fs.readFileSync('team-members.json', 'utf8'));
+
+            const authorType = (context.payload.issue || context.payload.pull_request).user.type;
+            if (authorType === 'Bot') {
+              core.info(`Author ${author} is a bot. Skipping comment.`);
+              return;
             }
 
             if (excludedUsers.includes(author.toLowerCase())) {
@@ -92,7 +100,7 @@ jobs:
               return;
             }
 
-            // Static comment templates with {{issueowner}} / {{issuenumber}} placeholders
+            // Static comment templates with {{issueowner}} / {{checksurl}} placeholders
             const templates = {
               'issues-opened': `Hi there {{issueowner}}!
 
@@ -165,7 +173,6 @@ jobs:
 
             const commentBody = dedent(templates[templateKey])
               .replaceAll('{{issueowner}}', `@${author}`)
-              .replaceAll('{{issuenumber}}', String(issueNumber))
               .replaceAll('{{checksurl}}', checksUrl)
               + `\n\n${marker}`;
 
