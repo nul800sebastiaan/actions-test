@@ -19,7 +19,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Restore cached team list
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: team-members.json
           key: team-members-cache-
@@ -30,7 +30,7 @@ jobs:
         # cache-hit is only 'true' on an exact key match, not a restore-keys
         # prefix match (the normal case here), so check the file directly.
         if: hashFiles('team-members.json') == ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           # PAT or GitHub App token with org:read:org (Members/Teams: Read).
           github-token: ${{ secrets.ORG_READ_TOKEN }}
@@ -62,7 +62,7 @@ jobs:
             fs.writeFileSync('team-members.json', JSON.stringify(Array.from(excludedUsers)));
 
       - name: Check author and comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');

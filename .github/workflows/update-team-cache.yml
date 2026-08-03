@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Fetch org teams and save to JSON
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           # PAT or GitHub App token with org:read:org (Members/Teams: Read).
           # A default GITHUB_TOKEN cannot read organization team membership.
@@ -48,7 +48,7 @@ jobs:
             fs.writeFileSync('team-members.json', JSON.stringify(uniqueList));
 
       - name: Push JSON to GitHub Actions Cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: team-members.json
           # Unique key per run; the notifier workflow restores via restore-keys

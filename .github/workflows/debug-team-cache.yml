@@ -1,0 +1,25 @@
+name: Debug Team Cache
+
+on:
+  workflow_dispatch:
+
+jobs:
+  print-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore cached team list
+        uses: actions/cache/restore@v6
+        with:
+          path: team-members.json
+          key: team-members-cache-
+          restore-keys: |
+            team-members-cache-
+
+      - name: Print contents
+        run: |
+          if [ -f team-members.json ]; then
+            echo "Entries: $(jq length team-members.json)"
+            jq . team-members.json
+          else
+            echo "team-members.json not found in cache."
+          fi
