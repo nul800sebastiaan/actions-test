@@ -1,0 +1,105 @@
+name: Community Notifier
+
+on:
+  issues:
+    types: [opened, labeled]
+  pull_request_target:
+    types: [opened]
+
+jobs:
+  check-and-comment:
+    # Only run for a new PR, a new issue, or an issue labeled 'community/up-for-grabs'
+    if: >
+      github.event_name == 'pull_request_target' ||
+      (github.event_name == 'issues' && github.event.action == 'opened') ||
+      (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'community/up-for-grabs')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Restore cached team list
+        uses: actions/cache/restore@v4
+        with:
+          path: team-members.json
+          key: team-members-cache-
+          restore-keys: |
+            team-members-cache-
+
+      - name: Fetch org teams if cache is missing
+        # cache-hit is only 'true' on an exact key match, not a restore-keys
+        # prefix match (the normal case here), so check the file directly.
+        if: hashFiles('team-members.json') == ''
+        uses: actions/github-script@v7
+        with:
+          # PAT or GitHub App token with org:read:org (Members/Teams: Read).
+          github-token: ${{ secrets.ORG_READ_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const org = 'umbraco';
+
+            // Keep this list identical to update-team-cache.yml
+            const excludedTeams = [
+              'hq-only-teams',
+            ];
+
+            const excludedUsers = new Set();
+
+            for (const team_slug of excludedTeams) {
+              try {
+                const members = await github.paginate(github.rest.teams.listMembersInOrg, {
+                  org,
+                  team_slug,
+                  per_page: 100
+                });
+                members.forEach(m => excludedUsers.add(m.login.toLowerCase()));
+              } catch (err) {
+                core.error(`Failed to fetch team ${team_slug}: ${err.message}`);
+              }
+            }
+
+            core.warning('Cache miss — fetched team memberships live for this run.');
+            fs.writeFileSync('team-members.json', JSON.stringify(Array.from(excludedUsers)));
+
+      - name: Check author and comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            const author = (context.payload.issue || context.payload.pull_request).user.login;
+            const issueNumber = (context.payload.issue || context.payload.pull_request).number;
+
+            let excludedUsers = [];
+            if (fs.existsSync('team-members.json')) {
+              excludedUsers = JSON.parse(fs.readFileSync('team-members.json', 'utf8'));
+            } else {
+              core.warning('team-members.json not found; proceeding as if no users are excluded.');
+            }
+
+            if (excludedUsers.includes(author.toLowerCase())) {
+              core.info(`User ${author} is in an excluded team. Skipping comment.`);
+              return;
+            }
+
+            // Static comment templates with {{issueowner}} / {{issuenumber}} placeholders
+            const templates = {
+              'pull_request_target': `Hi @{{issueowner}}, thanks for submitting this pull request! 🙌`,
+              'issues-opened': `Hi @{{issueowner}}, thanks for creating this issue!`,
+              'issues-labeled': `This issue is now **up for grabs**! Feel free to jump in, @{{issueowner}}.`
+            };
+
+            const templateKey = context.eventName === 'issues'
+              ? `issues-${context.payload.action}`
+              : context.eventName;
+
+            const commentBody = templates[templateKey]
+              .replaceAll('{{issueowner}}', author)
+              .replaceAll('{{issuenumber}}', String(issueNumber));
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: commentBody
+            });
